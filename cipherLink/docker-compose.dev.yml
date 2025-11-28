@@ -1,0 +1,67 @@
+# CipherLink Development Docker Compose
+# Use this for development with hot-reload
+
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: cipherlink-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: cipherlink
+    volumes:
+      - mongodb_data_dev:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - cipherlink-network-dev
+
+  # Backend API (with hot reload)
+  backend:
+    image: node:20-alpine
+    container_name: cipherlink-backend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/client
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+      - PORT=4200
+      - MONGODB_URI=mongodb://mongodb:27017/cipherlink
+      - JWT_SECRET=cipherlink-dev-secret
+      - JWT_EXPIRES_IN=7d
+      - CLIENT_URL=http://localhost:5173
+    depends_on:
+      - mongodb
+    networks:
+      - cipherlink-network-dev
+
+  # Frontend (with hot reload)
+  frontend:
+    image: node:20-alpine
+    container_name: cipherlink-frontend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:4200
+    networks:
+      - cipherlink-network-dev
+
+volumes:
+  mongodb_data_dev:
+    driver: local
+
+networks:
+  cipherlink-network-dev:
+    driver: bridge

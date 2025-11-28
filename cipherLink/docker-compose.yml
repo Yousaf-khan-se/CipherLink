@@ -1,0 +1,61 @@
+# CipherLink Docker Compose Configuration
+# For local development and testing
+
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: cipherlink-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: cipherlink
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - cipherlink-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/cipherlink --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # CipherLink Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cipherlink-app
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=production
+      - PORT=4200
+      - MONGODB_URI=mongodb://mongodb:27017/cipherlink
+      - JWT_SECRET=${JWT_SECRET:-cipherlink-docker-secret-change-in-production}
+      - JWT_EXPIRES_IN=7d
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:4200}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - cipherlink-network
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:4200/api/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  cipherlink-network:
+    driver: bridge

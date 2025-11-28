@@ -1,0 +1,29 @@
+# Render.com Build Configuration
+# https://render.com/docs/deploy-node-express-app
+
+services:
+  # Web Service (Backend + Frontend)
+  - type: web
+    name: cipherlink
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && cd client && npm install && npm run build && cd ..
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4200
+      - key: MONGODB_URI
+        sync: false # Set this in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_URL
+        fromService:
+          type: web
+          name: cipherlink
+          property: url

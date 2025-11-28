@@ -1,0 +1,45 @@
+{
+  "name": "cipherlink-server",
+  "version": "2.0.0",
+  "description": "CipherLink - End-to-End Encrypted Instant Messaging Application",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "build": "cd client && npm install && npm run build",
+    "build:docker": "docker build -t cipherlink .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up"
+  },
+  "keywords": [
+    "chat",
+    "encryption",
+    "e2e",
+    "security",
+    "messaging"
+  ],
+  "author": "CipherLink Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "morgan": "^1.10.0",
+    "socket.io": "^4.7.2",
+    "express-validator": "^7.0.1",
+    "xss-clean": "^0.1.4",
+    "hpp": "^0.2.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
