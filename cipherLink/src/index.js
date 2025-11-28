@@ -75,16 +75,17 @@ const limiter = rateLimit({
 // Apply rate limiting to API routes
 app.use('/api/', limiter);
 
-// Stricter rate limit for auth routes
+// Stricter rate limit for auth routes (will be applied to specific routes)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 attempts per window
+    max: 50, // Increased to allow username checking while typing
     message: {
         error: 'Too many authentication attempts, please try again later.'
     }
 });
 
-app.use('/api/auth/', authLimiter);
+// Export authLimiter to be used in specific auth routes
+export { authLimiter };
 
 // Body parsing middleware
 app.use(express.json({ limit: '10kb' })); // Limit body size

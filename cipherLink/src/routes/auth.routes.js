@@ -1,10 +1,22 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import User, { validateRegistration, validateLogin } from '../models/User.model.js';
 import { generateToken } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
+
+// Strict rate limiter for login and register only
+const strictAuthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 attempts per window
+    message: {
+        error: 'Too many authentication attempts, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // PBKDF2 configuration - server side
 const PBKDF2_ITERATIONS = 50000;
@@ -36,7 +48,7 @@ const hashPassword = async (clientAuth, salt) => {
  * @desc    Register new user
  * @access  Public
  */
-router.post('/register', async (req, res) => {
+router.post('/register', strictAuthLimiter, async (req, res) => {
     try {
         // Validate request body
         const { error } = validateRegistration(req.body);
@@ -107,7 +119,7 @@ router.post('/register', async (req, res) => {
  * @desc    Authenticate user & get token
  * @access  Public
  */
-router.post('/login', async (req, res) => {
+router.post('/login', strictAuthLimiter, async (req, res) => {
     try {
         // Validate request body
         const { error } = validateLogin(req.body);
