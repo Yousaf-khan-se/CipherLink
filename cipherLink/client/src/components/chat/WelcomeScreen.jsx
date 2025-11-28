@@ -30,11 +30,11 @@ export function WelcomeScreen() {
     ];
 
     return (
-        <div className="flex-1 flex items-center justify-center p-8 cyber-bg">
+        <div className="flex-1 flex items-center justify-center p-8 cyber-bg overflow-y-auto">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="text-center max-w-2xl"
+                className="text-center max-w-2xl my-auto"
             >
                 <div className="mb-8">
                     <Logo size="xl" />
