@@ -8,7 +8,8 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm install && cd client && npm install && npm run build && cd ..
+    rootDir: .
+    buildCommand: npm install && cd client && npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -17,7 +18,7 @@ services:
       - key: PORT
         value: 4200
       - key: MONGODB_URI
-        sync: false # Set this in Render dashboard
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
