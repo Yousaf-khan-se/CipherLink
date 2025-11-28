@@ -45,6 +45,10 @@ COPY cipherLink/src/ ./src/
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/client/dist ./client/dist
 
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=4200
+
 # Set ownership to non-root user
 RUN chown -R cipherlink:nodejs /app
 
