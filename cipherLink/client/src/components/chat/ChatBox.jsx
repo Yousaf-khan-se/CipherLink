@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Send, Loader2, Shield, ArrowLeft, Fingerprint } from 'lucide-react';
@@ -19,6 +19,8 @@ export function ChatBox() {
     const [showFingerprint, setShowFingerprint] = useState(false);
     const [fingerprint, setFingerprint] = useState('');
     const messagesEndRef = useRef(null);
+    const typingTimeoutRef = useRef(null);
+    const isTypingRef = useRef(false);
 
     const { user, privateKey } = useAuthStore();
     const {
@@ -54,23 +56,43 @@ export function ChatBox() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // Typing indicator
-    const handleTyping = () => {
-        socketService.emitTypingStart({
-            channel: channelId,
-            username: user.username,
-            receiverPublicKeyHash: currentChatmate?.publicKeyHash
-        });
+    // Cleanup typing timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+        };
+    }, []);
 
-        // Stop typing after 2 seconds
-        setTimeout(() => {
+    // Typing indicator with proper debouncing
+    const handleTyping = useCallback(() => {
+        // Clear existing timeout
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+
+        // Emit typing start only if not already typing
+        if (!isTypingRef.current) {
+            isTypingRef.current = true;
+            socketService.emitTypingStart({
+                channel: channelId,
+                username: user.username,
+                receiverPublicKeyHash: currentChatmate?.publicKeyHash
+            });
+        }
+
+        // Stop typing after 2 seconds of no input
+        typingTimeoutRef.current = setTimeout(() => {
+            isTypingRef.current = false;
             socketService.emitTypingStop({
                 channel: channelId,
                 username: user.username,
                 receiverPublicKeyHash: currentChatmate?.publicKeyHash
             });
+            typingTimeoutRef.current = null;
         }, 2000);
-    };
+    }, [channelId, user.username, currentChatmate?.publicKeyHash]);
 
     const handleSend = async (e) => {
         e.preventDefault();

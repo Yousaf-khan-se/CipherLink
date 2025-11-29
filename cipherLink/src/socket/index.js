@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import User from '../models/User.model.js';
 
 /**
@@ -8,8 +9,28 @@ export const initializeSocket = (io) => {
     // Store active connections
     const activeConnections = new Map();
 
+    // Socket authentication middleware - verify JWT token on connection
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token;
+
+        if (!token) {
+            return next(new Error('Authentication required'));
+        }
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            socket.user = decoded; // Attach verified user data to socket
+            next();
+        } catch (err) {
+            if (err.name === 'TokenExpiredError') {
+                return next(new Error('Token expired'));
+            }
+            return next(new Error('Invalid token'));
+        }
+    });
+
     io.on('connection', (socket) => {
-        console.log(`🔌 New connection: ${socket.id}`);
+        console.log(`🔌 New authenticated connection: ${socket.id} (${socket.user?.username})`);
 
         /**
          * Handle user coming online
