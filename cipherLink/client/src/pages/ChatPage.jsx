@@ -25,28 +25,39 @@ export default function ChatPage() {
         handleTypingStop
     } = useChatStore();
 
-    // Setup socket listeners
+    // Load initial data on mount
     useEffect(() => {
-        // Load initial data
         loadOnlineUsers();
         loadPrivateChannels();
+    }, [loadOnlineUsers, loadPrivateChannels]);
+
+    // Setup socket listeners - use refs to avoid stale closures
+    useEffect(() => {
+        // Store current handler references
+        const handlers = {
+            userConnected: handleUserConnected,
+            userDisconnected: handleUserDisconnected,
+            messageReceived: receiveMessage,
+            typingStart: handleTypingStart,
+            typingStop: handleTypingStop
+        };
 
         // Setup socket event listeners
-        socketService.on('user-connected', handleUserConnected);
-        socketService.on('user-disconnected', handleUserDisconnected);
-        socketService.on('message-received', receiveMessage);
-        socketService.on('user-typing', handleTypingStart);
-        socketService.on('user-stopped-typing', handleTypingStop);
+        socketService.on('user-connected', handlers.userConnected);
+        socketService.on('user-disconnected', handlers.userDisconnected);
+        socketService.on('message-received', handlers.messageReceived);
+        socketService.on('user-typing', handlers.typingStart);
+        socketService.on('user-stopped-typing', handlers.typingStop);
 
-        // Cleanup on unmount
+        // Cleanup on unmount or when handlers change
         return () => {
-            socketService.off('user-connected', handleUserConnected);
-            socketService.off('user-disconnected', handleUserDisconnected);
-            socketService.off('message-received', receiveMessage);
-            socketService.off('user-typing', handleTypingStart);
-            socketService.off('user-stopped-typing', handleTypingStop);
+            socketService.off('user-connected', handlers.userConnected);
+            socketService.off('user-disconnected', handlers.userDisconnected);
+            socketService.off('message-received', handlers.messageReceived);
+            socketService.off('user-typing', handlers.typingStart);
+            socketService.off('user-stopped-typing', handlers.typingStop);
         };
-    }, []);
+    }, [handleUserConnected, handleUserDisconnected, receiveMessage, handleTypingStart, handleTypingStop]);
 
     return (
         <div className="h-screen flex bg-dark-950">

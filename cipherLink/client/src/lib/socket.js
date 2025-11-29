@@ -7,9 +7,10 @@ class SocketService {
     }
 
     /**
-     * Connect to socket server
+     * Connect to socket server with authentication
+     * @param {string} token - JWT token for authentication
      */
-    connect() {
+    connect(token) {
         if (this.socket?.connected) {
             return this.socket;
         }
@@ -23,7 +24,10 @@ class SocketService {
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
-            timeout: 20000
+            timeout: 20000,
+            auth: {
+                token: token // Send JWT token for socket authentication
+            }
         });
 
         this.socket.on('connect', () => {
@@ -36,6 +40,10 @@ class SocketService {
 
         this.socket.on('connect_error', (error) => {
             console.error('🔌 Socket connection error:', error.message);
+            // If authentication failed, could trigger logout
+            if (error.message === 'Authentication required' || error.message === 'Invalid token' || error.message === 'Token expired') {
+                console.warn('🔒 Socket authentication failed');
+            }
         });
 
         return this.socket;

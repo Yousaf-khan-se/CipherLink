@@ -37,8 +37,8 @@ export const useAuthStore = create((set, get) => ({
             const publicKey = storage.get(PUBLIC_KEY_KEY);
 
             if (token && user && privateKey && publicKey) {
-                // Connect socket and emit online status
-                socketService.connect();
+                // Connect socket with token for authentication and emit online status
+                socketService.connect(token);
 
                 set({
                     user,
@@ -102,8 +102,8 @@ export const useAuthStore = create((set, get) => ({
             storage.set(PUBLIC_KEY_KEY, keyPair.publicKey);
             secureStorage.set(PRIVATE_KEY_KEY, keyPair.privateKey);
 
-            // Connect socket
-            socketService.connect();
+            // Connect socket with token for authentication
+            socketService.connect(token);
             socketService.emitUserOnline(user);
 
             set({
@@ -151,8 +151,8 @@ export const useAuthStore = create((set, get) => ({
             storage.set(PUBLIC_KEY_KEY, user.publicKey);
             secureStorage.set(PRIVATE_KEY_KEY, privateKey);
 
-            // Connect socket
-            socketService.connect();
+            // Connect socket with token for authentication
+            socketService.connect(token);
             socketService.emitUserOnline(user);
 
             set({

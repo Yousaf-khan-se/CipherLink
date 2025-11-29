@@ -21,16 +21,31 @@ export function Inbox() {
         setCurrentChannel
     } = useChatStore();
 
-    // Load private channels with user info
+    // Load private channels on mount
     useEffect(() => {
-        const loadChannelsWithUsers = async () => {
+        loadPrivateChannels();
+    }, [loadPrivateChannels]);
+
+    // Process channels when privateChannels changes (separate effect to avoid race condition)
+    useEffect(() => {
+        const processChannels = async () => {
+            if (privateChannels.length === 0) {
+                setChannels([]);
+                setIsLoading(false);
+                return;
+            }
+
             setIsLoading(true);
-            await loadPrivateChannels();
 
             // Get user info for each channel
             const channelsWithUsers = await Promise.all(
                 privateChannels.map(async (channel) => {
                     const lastMsg = channel.lastMessage;
+
+                    // Guard against missing lastMessage
+                    if (!lastMsg) {
+                        return null;
+                    }
 
                     // Determine the other user's public key hash
                     const otherUserHash = lastMsg.senderPublicKeyHash === user.publicKeyHash
@@ -69,12 +84,13 @@ export function Inbox() {
                 })
             );
 
-            setChannels(channelsWithUsers);
+            // Filter out null entries (channels with no lastMessage)
+            setChannels(channelsWithUsers.filter(Boolean));
             setIsLoading(false);
         };
 
-        loadChannelsWithUsers();
-    }, [privateChannels.length]);
+        processChannels();
+    }, [privateChannels, user.publicKeyHash, privateKey, unreadCounts]);
 
     const handleOpenChat = async (channel) => {
         await setCurrentChannel(channel._id, channel.otherUser);
