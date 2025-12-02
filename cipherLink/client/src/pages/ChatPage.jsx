@@ -21,6 +21,7 @@ export default function ChatPage() {
         handleUserConnected,
         handleUserDisconnected,
         receiveMessage,
+        messageSent,
         handleTypingStart,
         handleTypingStop
     } = useChatStore();
@@ -33,11 +34,14 @@ export default function ChatPage() {
 
     // Setup socket listeners - use refs to avoid stale closures
     useEffect(() => {
+        console.log(`🔌 [ChatPage] Setting up socket event listeners...`);
+
         // Store current handler references
         const handlers = {
             userConnected: handleUserConnected,
             userDisconnected: handleUserDisconnected,
             messageReceived: receiveMessage,
+            messageSent: messageSent,
             typingStart: handleTypingStart,
             typingStop: handleTypingStop
         };
@@ -46,18 +50,23 @@ export default function ChatPage() {
         socketService.on('user-connected', handlers.userConnected);
         socketService.on('user-disconnected', handlers.userDisconnected);
         socketService.on('message-received', handlers.messageReceived);
+        socketService.on('message-sent', handlers.messageSent);
         socketService.on('user-typing', handlers.typingStart);
         socketService.on('user-stopped-typing', handlers.typingStop);
 
+        console.log(`✅ [ChatPage] Socket listeners registered (connected: ${socketService.isConnected()})`);
+
         // Cleanup on unmount or when handlers change
         return () => {
+            console.log(`🔌 [ChatPage] Cleaning up socket listeners...`);
             socketService.off('user-connected', handlers.userConnected);
             socketService.off('user-disconnected', handlers.userDisconnected);
             socketService.off('message-received', handlers.messageReceived);
+            socketService.off('message-sent', handlers.messageSent);
             socketService.off('user-typing', handlers.typingStart);
             socketService.off('user-stopped-typing', handlers.typingStop);
         };
-    }, [handleUserConnected, handleUserDisconnected, receiveMessage, handleTypingStart, handleTypingStop]);
+    }, [handleUserConnected, handleUserDisconnected, receiveMessage, messageSent, handleTypingStart, handleTypingStop]);
 
     return (
         <div className="h-screen flex bg-dark-950">

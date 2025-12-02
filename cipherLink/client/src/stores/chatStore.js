@@ -115,6 +115,11 @@ export const useChatStore = create((set, get) => ({
             const { user, privateKey, publicKey } = useAuthStore.getState();
 
             const timestamp = new Date().toISOString();
+            const msgType = currentChannel === 'global' ? 'GLOBAL' : 'PRIVATE/ENCRYPTED';
+
+            console.log(`\n📤 [FRONTEND] SENDING MESSAGE`);
+            console.log(`   Type: ${msgType}`);
+            console.log(`   To: ${currentChatmate?.username || 'everyone'}`);
 
             let messageData = {
                 senderName: user.username,
@@ -128,16 +133,20 @@ export const useChatStore = create((set, get) => ({
 
             // Encrypt for private channels
             if (currentChannel !== 'global' && currentChatmate?.publicKey) {
+                console.log(`   🔐 Encrypting message...`);
                 messageData = await encryptMessage(
                     messageData,
                     privateKey,
                     currentChatmate.publicKey
                 );
+                console.log(`   ✅ Message encrypted`);
             }
 
             // Save to database
+            console.log(`   💾 Saving to database...`);
             const response = await chatApi.sendMessage(messageData);
             const savedMessage = response.data;
+            console.log(`   ✅ Saved to DB`);
 
             // Add decrypted version to local state
             const localMessage = {
@@ -153,7 +162,9 @@ export const useChatStore = create((set, get) => ({
             }));
 
             // Broadcast via socket
+            console.log(`   📡 Emitting via socket...`);
             socketService.emitNewMessage(savedMessage);
+            console.log(`   ✅ Message send complete\n`);
 
             return { success: true };
         } catch (error) {
@@ -168,6 +179,12 @@ export const useChatStore = create((set, get) => ({
     receiveMessage: async (messageData) => {
         const { currentChannel, currentChatmate } = get();
         const { user, privateKey } = useAuthStore.getState();
+        const msgType = messageData.channel === 'global' ? 'GLOBAL' : 'PRIVATE/ENCRYPTED';
+
+        console.log(`\n📥 [FRONTEND] MESSAGE RECEIVED`);
+        console.log(`   Type: ${msgType}`);
+        console.log(`   From: ${messageData.senderName}`);
+        console.log(`   Is for current view: ${messageData.channel === currentChannel}`);
 
         // Check if message is for current channel
         if (messageData.channel === currentChannel) {
@@ -175,14 +192,18 @@ export const useChatStore = create((set, get) => ({
 
             // Decrypt if needed
             if (messageData.messageType === 'encrypted' && currentChatmate?.publicKey) {
+                console.log(`   🔓 Decrypting message...`);
                 message = await decryptMessage(messageData, privateKey, currentChatmate.publicKey);
+                console.log(`   ✅ Message decrypted`);
             }
 
+            console.log(`   ➕ Adding to messages array`);
             set((state) => ({
                 messages: [...state.messages, message]
             }));
         } else if (messageData.channel !== 'global') {
             // Update unread count for other channels
+            console.log(`   📊 Updating unread count`);
             set((state) => ({
                 unreadCounts: {
                     ...state.unreadCounts,
@@ -190,6 +211,32 @@ export const useChatStore = create((set, get) => ({
                 }
             }));
         }
+
+        // Refresh privateChannels list when a private message arrives
+        if (messageData.channel !== 'global') {
+            console.log(`   🔄 Refreshing inbox...`);
+            await get().loadPrivateChannels();
+            console.log(`   ✅ Inbox refreshed`);
+        }
+        console.log(`   ✅ receiveMessage complete\n`);
+    },
+
+    /**
+     * Handle message sent confirmation (from socket) - updates sender's Inbox
+     */
+    messageSent: async (messageData) => {
+        const msgType = messageData.channel === 'global' ? 'GLOBAL' : 'PRIVATE/ENCRYPTED';
+
+        console.log(`\n📤 [FRONTEND] MESSAGE SENT CONFIRMATION`);
+        console.log(`   Type: ${msgType}`);
+
+        // Refresh privateChannels list when sender sends a private message
+        if (messageData.channel !== 'global') {
+            console.log(`   🔄 Refreshing inbox for sender...`);
+            await get().loadPrivateChannels();
+            console.log(`   ✅ Inbox refreshed`);
+        }
+        console.log(`   ✅ messageSent complete\n`);
     },
 
     /**

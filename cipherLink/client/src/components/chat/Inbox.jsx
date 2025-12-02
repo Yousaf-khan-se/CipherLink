@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Inbox as InboxIcon, Lock, Loader2, MessageSquare } from 'lucide-react';
@@ -21,6 +21,10 @@ export function Inbox() {
         setCurrentChannel
     } = useChatStore();
 
+    // Use refs to track processing state and avoid race conditions
+    const isProcessingRef = useRef(false);
+    const processVersionRef = useRef(0);
+
     // Load private channels on mount
     useEffect(() => {
         loadPrivateChannels();
@@ -29,68 +33,84 @@ export function Inbox() {
     // Process channels when privateChannels changes (separate effect to avoid race condition)
     useEffect(() => {
         const processChannels = async () => {
+            // Prevent concurrent processing
+            if (isProcessingRef.current) {
+                return;
+            }
+
             if (privateChannels.length === 0) {
                 setChannels([]);
                 setIsLoading(false);
                 return;
             }
 
+            isProcessingRef.current = true;
+            const currentVersion = ++processVersionRef.current;
             setIsLoading(true);
 
-            // Get user info for each channel
-            const channelsWithUsers = await Promise.all(
-                privateChannels.map(async (channel) => {
-                    const lastMsg = channel.lastMessage;
+            try {
+                // Get user info for each channel
+                const channelsWithUsers = await Promise.all(
+                    privateChannels.map(async (channel) => {
+                        const lastMsg = channel.lastMessage;
 
-                    // Guard against missing lastMessage
-                    if (!lastMsg) {
-                        return null;
-                    }
-
-                    // Determine the other user's public key hash
-                    const otherUserHash = lastMsg.senderPublicKeyHash === user.publicKeyHash
-                        ? lastMsg.receiverPublicKeyHash
-                        : lastMsg.senderPublicKeyHash;
-
-                    try {
-                        const response = await userApi.getUserByHash(otherUserHash);
-                        const otherUser = response.data;
-
-                        // Try to decrypt last message preview
-                        let preview = 'Encrypted message';
-                        if (otherUser.publicKey && privateKey) {
-                            try {
-                                const decrypted = await decryptMessage(lastMsg, privateKey, otherUser.publicKey);
-                                preview = decrypted.message || 'Encrypted message';
-                            } catch {
-                                // Keep encrypted preview
-                            }
+                        // Guard against missing lastMessage
+                        if (!lastMsg) {
+                            return null;
                         }
 
-                        return {
-                            ...channel,
-                            otherUser,
-                            preview,
-                            unread: unreadCounts[channel._id] || channel.unreadCount || 0
-                        };
-                    } catch {
-                        return {
-                            ...channel,
-                            otherUser: { username: 'Unknown', publicKeyHash: otherUserHash },
-                            preview: 'Encrypted message',
-                            unread: 0
-                        };
-                    }
-                })
-            );
+                        // Determine the other user's public key hash
+                        const otherUserHash = lastMsg.senderPublicKeyHash === user.publicKeyHash
+                            ? lastMsg.receiverPublicKeyHash
+                            : lastMsg.senderPublicKeyHash;
 
-            // Filter out null entries (channels with no lastMessage)
-            setChannels(channelsWithUsers.filter(Boolean));
-            setIsLoading(false);
+                        try {
+                            const response = await userApi.getUserByHash(otherUserHash);
+                            const otherUser = response.data;
+
+                            // Try to decrypt last message preview
+                            let preview = 'Encrypted message';
+                            if (otherUser.publicKey && privateKey) {
+                                try {
+                                    const decrypted = await decryptMessage(lastMsg, privateKey, otherUser.publicKey);
+                                    preview = decrypted.message || 'Encrypted message';
+                                } catch {
+                                    // Keep encrypted preview
+                                }
+                            }
+
+                            // Get current unread count from store
+                            const currentUnreadCounts = useChatStore.getState().unreadCounts;
+
+                            return {
+                                ...channel,
+                                otherUser,
+                                preview,
+                                unread: currentUnreadCounts[channel._id] || channel.unreadCount || 0
+                            };
+                        } catch {
+                            return {
+                                ...channel,
+                                otherUser: { username: 'Unknown', publicKeyHash: otherUserHash },
+                                preview: 'Encrypted message',
+                                unread: 0
+                            };
+                        }
+                    })
+                );
+
+                // Only update state if this is still the latest version
+                if (currentVersion === processVersionRef.current) {
+                    setChannels(channelsWithUsers.filter(Boolean));
+                    setIsLoading(false);
+                }
+            } finally {
+                isProcessingRef.current = false;
+            }
         };
 
         processChannels();
-    }, [privateChannels, user.publicKeyHash, privateKey, unreadCounts]);
+    }, [privateChannels, user.publicKeyHash, privateKey]);
 
     const handleOpenChat = async (channel) => {
         await setCurrentChannel(channel._id, channel.otherUser);
