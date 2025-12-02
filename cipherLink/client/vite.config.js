@@ -25,12 +25,26 @@ export default defineConfig(({ mode }) => {
                     target: 'http://127.0.0.1:4200',
                     changeOrigin: true,
                     secure: false,
+                    configure: (proxy) => {
+                        proxy.on('error', () => { });
+                        proxy.on('proxyReq', (proxyReq, req, res) => {
+                            // Handle connection errors silently
+                            res.on('error', () => { });
+                        });
+                    },
                 },
                 '/socket.io': {
                     target: 'http://127.0.0.1:4200',
                     changeOrigin: true,
                     ws: true,
                     secure: false,
+                    configure: (proxy) => {
+                        // Suppress all proxy errors (connection refused, reset, etc.)
+                        proxy.on('error', () => { });
+                        proxy.on('proxyReqWs', (proxyReq, req, socket) => {
+                            socket.on('error', () => { });
+                        });
+                    },
                 },
             },
         },

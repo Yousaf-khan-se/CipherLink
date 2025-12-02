@@ -4,6 +4,7 @@ class SocketService {
     constructor() {
         this.socket = null;
         this.listeners = new Map();
+        this.pendingUserData = null; // Store user data to emit when connected
     }
 
     /**
@@ -15,15 +16,22 @@ class SocketService {
             return this.socket;
         }
 
+        // If socket exists but is disconnected, clean it up first
+        if (this.socket) {
+            this.socket.removeAllListeners();
+            this.socket = null;
+        }
+
         const socketUrl = import.meta.env.VITE_SOCKET_URL || '';
 
         this.socket = io(socketUrl, {
             transports: ['websocket', 'polling'],
             autoConnect: true,
             reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 10000,
+            randomizationFactor: 0.5,
             timeout: 20000,
             auth: {
                 token: token // Send JWT token for socket authentication
@@ -32,17 +40,46 @@ class SocketService {
 
         this.socket.on('connect', () => {
             console.log('🔌 Socket connected:', this.socket.id);
+
+            // Emit pending user-online event if we have user data waiting
+            if (this.pendingUserData) {
+                console.log('📤 Emitting pending user-online for:', this.pendingUserData.username);
+                this.socket.emit('user-online', this.pendingUserData);
+                this.pendingUserData = null;
+            }
         });
 
         this.socket.on('disconnect', (reason) => {
             console.log('🔌 Socket disconnected:', reason);
+            // Don't log reconnection attempts as errors
+            if (reason === 'io server disconnect') {
+                // Server disconnected us, might need to reconnect manually
+                this.socket.connect();
+            }
+        });
+
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('🔌 Socket reconnected after', attemptNumber, 'attempts');
+
+            // Re-emit user-online on reconnect if we have stored user data
+            if (this.pendingUserData) {
+                console.log('📤 Re-emitting user-online after reconnect for:', this.pendingUserData.username);
+                this.socket.emit('user-online', this.pendingUserData);
+            }
+        });
+
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            // Silent - don't log each attempt to reduce console noise
+        });
+
+        this.socket.on('reconnect_error', (error) => {
+            // Silent - don't log reconnect errors to reduce console noise
         });
 
         this.socket.on('connect_error', (error) => {
-            console.error('🔌 Socket connection error:', error.message);
-            // If authentication failed, could trigger logout
+            // Only log authentication errors, not connection errors
             if (error.message === 'Authentication required' || error.message === 'Invalid token' || error.message === 'Token expired') {
-                console.warn('🔒 Socket authentication failed');
+                console.warn('🔒 Socket authentication failed:', error.message);
             }
         });
 
@@ -134,11 +171,20 @@ class SocketService {
      * Emit user online status
      */
     emitUserOnline(userData) {
-        this.emit('user-online', {
+        const data = {
             userId: userData._id,
             username: userData.username,
             publicKeyHash: userData.publicKeyHash
-        });
+        };
+
+        if (this.socket?.connected) {
+            console.log('📤 Emitting user-online immediately for:', userData.username);
+            this.socket.emit('user-online', data);
+        } else {
+            // Store for later emission when socket connects
+            console.log('⏳ Socket not connected, queuing user-online for:', userData.username);
+            this.pendingUserData = data;
+        }
     }
 
     /**

@@ -39,7 +39,12 @@ export const initializeSocket = (io) => {
             try {
                 const { userId, username, publicKeyHash } = data;
 
+                console.log(`\n📥 [SERVER] USER-ONLINE event received`);
+                console.log(`   Username: ${username}`);
+                console.log(`   Socket ID: ${socket.id}`);
+
                 if (!userId || !username) {
+                    console.log(`   ⚠️ Missing userId or username, ignoring`);
                     return;
                 }
 
@@ -60,6 +65,8 @@ export const initializeSocket = (io) => {
                 socket.join(`user:${userId}`);
                 socket.join(`user:${publicKeyHash}`);
 
+                console.log(`   ✅ User joined private rooms`);
+
                 // Broadcast to all other users
                 socket.broadcast.emit('user-connected', {
                     userId,
@@ -68,7 +75,7 @@ export const initializeSocket = (io) => {
                     socketId: socket.id
                 });
 
-                console.log(`✅ User online: ${username} (${socket.id})`);
+                console.log(`✅ User online: ${username} (${socket.id})\n`);
             } catch (err) {
                 console.error('user-online error:', err);
             }
@@ -86,19 +93,31 @@ export const initializeSocket = (io) => {
          */
         socket.on('new-message', (messageData) => {
             try {
-                const { channel, receiverPublicKeyHash } = messageData;
+                const { channel, receiverPublicKeyHash, senderPublicKeyHash, messageType } = messageData;
+                const msgType = channel === 'global' ? 'GLOBAL' : 'PRIVATE/ENCRYPTED';
+
+                console.log(`\n📨 [SERVER] NEW MESSAGE RECEIVED`);
+                console.log(`   Type: ${msgType}`);
+                console.log(`   MessageType: ${messageType}`);
 
                 if (channel === 'global') {
                     // Broadcast to everyone in global channel
+                    console.log(`   ➡️  Broadcasting to all users (global)`);
                     socket.broadcast.emit('message-received', messageData);
                 } else {
                     // Send to specific user's room
                     if (receiverPublicKeyHash) {
-                        socket.to(`user:${receiverPublicKeyHash}`).emit('message-received', messageData);
+                        const targetRoom = `user:${receiverPublicKeyHash}`;
+                        console.log(`   ➡️  Emitting 'message-received' to recipient`);
+                        socket.to(targetRoom).emit('message-received', messageData);
+                    } else {
+                        console.log(`   ⚠️  No receiver specified for private message!`);
                     }
                     // Also emit to sender for multi-device support
+                    console.log(`   ➡️  Emitting 'message-sent' back to sender`);
                     socket.emit('message-sent', messageData);
                 }
+                console.log(`   ✅ Message routing complete\n`);
             } catch (err) {
                 console.error('new-message error:', err);
             }
